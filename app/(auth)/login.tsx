@@ -4,27 +4,50 @@ import { verticalScale } from "@/utils/styling";
 import ScreenWrapper from "@/components/ScreenWrapper"; // ⚠️ ye missing ho sakta hai
 import BackButton from "@/components/BackButton";
 import Typo from "@/components/Typo";
+import { loginApi, saveTokens } from "@/services/api";
 
 import * as Icon from "phosphor-react-native";
 
 import Input from "@/components/input";
 import { useRef, useState } from "react";
 import Button from "@/components/Button";
-import { useRouter } from "expo-router"
+import { useRouter } from "expo-router";
 
 const Login = () => {
-  const emailRef = useRef("");
+  const usernameRef = useRef("");
   const passwordRef = useRef("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  // handleSumit replace karo
   const handleSumit = async () => {
-    if (!emailRef.current || !passwordRef.current) {
-      Alert.alert("Login", "Please enter both email and password");
+    if (!usernameRef.current || !passwordRef.current) {
+      Alert.alert("Login", "Please enter both Username and password");
       return;
     }
-    console.log("Email:", emailRef.current);
-    console.log("Password:", passwordRef.current);
-    console.log("Good To Go");
+
+    try {
+      setIsLoading(true);
+      const response = await loginApi({
+        username: usernameRef.current,
+        password: passwordRef.current,
+      });
+
+      // Token save karo
+      await saveTokens(response.accessToken, response.token);
+
+      console.log("✅ Login successful:", response);
+
+      // ✅ Login ke baad home pe navigate karo
+      router.replace("/(tabs)" as any); // baad mein sahi route daalna
+    } catch (error: any) {
+      const msg = error?.response?.data || "Login failed. Check credentials.";
+      Alert.alert(
+        "Login Failed",
+        typeof msg === "string" ? msg : "Something went wrong",
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
   return (
     <ScreenWrapper>
@@ -43,10 +66,10 @@ const Login = () => {
             Login Now To Track All Your Expenses
           </Typo>
           <Input
-            placeholder="Enter your email"
-            onChangeText={(value) => (emailRef.current = value)}
+            placeholder="Enter your username"
+            onChangeText={(value) => (usernameRef.current = value)}
             icon={
-              <Icon.At
+              <Icon.UserIcon
                 size={verticalScale(26)}
                 color={colors.neutral300}
                 weight="fill"
