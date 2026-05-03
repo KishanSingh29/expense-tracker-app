@@ -1,50 +1,242 @@
-# Welcome to your Expo app 👋
+markdown# 💸 Expense Tracker — Backend Microservices
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+An AI-powered automatic expense tracking system built with Spring Boot Microservices, Apache Kafka, and Mistral AI.
 
-## Get started
+> Automatically detects payment SMS/notifications, extracts expense data using AI, and saves it in real-time — no manual entry required.
 
-1. Install dependencies
+---
 
-   ```bash
-   npm install
-   ```
+## 🏗️ Architecture
+📱 React Native App (Frontend)
+|
+├──── REST ────────────────────────────┐
+▼                                      ▼
++------------------+              +------------------+
+|   AuthService    |──── Kafka ──▶|   UserService    |
+|   Port: 9898     |  user_service|   Port: 9810     |
+|  (JWT + BCrypt)  |    topic     |  (JWT Validated) |
++------------------+              +------------------+
+MySQL (userservice DB)
+|
+| SMS detected by App
+▼
++----------------------+
+|  DataScience Service | ← Flask + Mistral AI
+|     Port: 8000       | ← Parses SMS text
++----------------------+
+|
+| Kafka (expense_service topic)
+▼
++------------------+
+|  ExpenseService  |
+|   Port: 9820     |
++------------------+
+|
+▼
+MySQL (expenseservice DB)
 
-2. Start the app
+---
 
-   ```bash
-   npx expo start
-   ```
+## 🚀 Features
 
-In the output, you'll find options to open the app in a
+- ✅ JWT Authentication with Access + Refresh Token rotation
+- ✅ Real-time SMS detection using native Android module
+- ✅ AI-powered expense parsing using **Mistral AI + LangChain**
+- ✅ Async event-driven architecture using **Apache Kafka**
+- ✅ Separate MySQL database per microservice
+- ✅ User profile management with JWT-secured APIs
+- ✅ Manual + automatic expense tracking
+- ✅ React Native mobile app (Expo Dev Build)
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+---
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## 🛠️ Tech Stack
 
-## Get a fresh project
+| Layer | Technology |
+|---|---|
+| Backend | Spring Boot 3, Java 21 |
+| Messaging | Apache Kafka |
+| AI/ML | Mistral AI, LangChain, Flask (Python) |
+| Database | MySQL (separate DB per service) |
+| Auth | JWT (Access + Refresh Token), Spring Security, BCrypt |
+| Frontend | React Native (Expo) |
+| SMS Detection | @maniac-tech/react-native-expo-read-sms |
+| Containerization | Docker |
 
-When you're ready, run:
+---
 
-```bash
-npm run reset-project
+## 📦 Microservices
+
+### 1. AuthService (Port: 9898)
+Handles user registration and authentication. Publishes user events to Kafka.
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| POST | `/auth/v1/signup` | Public | Register new user |
+| POST | `/auth/v1/login` | Public | Login and get tokens |
+| POST | `/auth/v1/refreshToken` | Public | Refresh access token |
+| GET | `/auth/v1/ping` | JWT | Auth check |
+| GET | `/health` | Public | Health check |
+
+**On Signup:** Publishes `UserInfoEvent` to Kafka topic `user_service`
+
+---
+
+### 2. UserService (Port: 9810)
+Manages user profile data. Consumes user events from Kafka. JWT validation on all endpoints.
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| GET | `/user/v1/me?userId=` | JWT | Get user profile |
+| PUT | `/user/v1/update?userId=` | JWT | Update profile |
+| GET | `/health` | Public | Health check |
+
+**Kafka Consumer:** Listens to `user_service` topic → saves user profile to MySQL
+
+---
+
+### 3. DataScience Service (Port: 8000)
+Flask service that uses Mistral AI + LangChain to parse payment SMS text.
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| POST | `/v1/ds/message` | x-user-id header | Parse SMS and extract expense |
+| GET | `/health` | Public | Health check |
+
+**Request Body:**
+```json
+{
+  "message": "Spent INR 350 at Zomato using HDFC card"
+}
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+**Response:**
+```json
+{
+  "amount": "350",
+  "merchant": "Zomato", 
+  "currency": "INR"
+}
+```
 
-## Learn more
+**SMS Filter:** Only processes SMS containing keywords: `spent`, `bank`, `card`
 
-To learn more about developing your project with Expo, look at the following resources:
+**On Success:** Publishes parsed data to Kafka topic `expense_service`
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+---
 
-## Join the community
+### 4. ExpenseService (Port: 9820)
+Stores and manages expense records. Acts as both Kafka consumer and REST API provider.
 
-Join our community of developers creating universal apps.
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| GET | `/expense/v1/getExpense` | X-User-Id header | Get all user expenses |
+| POST | `/expense/v1/addExpense` | X-User-Id header | Manually add expense |
+| GET | `/health` | Public | Health check |
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+**Kafka Consumer:** Listens to `expense_service` topic → saves expense to MySQL
+
+---
+
+## 🔄 How It Works
+
+### Auto Flow (SMS Detection):
+
+User receives payment SMS on phone
+React Native app detects SMS in background (Android native module)
+SMS filtered — contains "spent/bank/card" keywords?
+POST /v1/ds/message → DataScience Service
+Mistral AI extracts: amount, merchant, currency
+Publishes to Kafka topic: expense_service
+ExpenseService consumes → saves to MySQL
+Home screen auto-refreshes with new expense
+
+
+### Manual Flow:
+
+User taps "+" button in app
+POST /expense/v1/addExpense with X-User-Id header
+ExpenseService saves to MySQL
+UI updates
+
+
+### Auth Flow:
+
+POST /auth/v1/signup → JWT tokens + userId returned
+AuthService publishes to Kafka → UserService saves profile
+Tokens stored in AsyncStorage
+All secured APIs use Bearer token or X-User-Id header
+Token expired → POST /auth/v1/refreshToken → new access token
+
+
+---
+
+## ⚙️ Local Setup
+
+### Prerequisites
+- Java 21
+- Python 3.9+
+- Docker Desktop
+- MySQL 8.0
+- Node.js 18+
+
+### Step 1 — Start Kafka (Docker)
+```bash
+docker-compose up -d
+```
+
+### Step 2 — Configure MySQL
+```sql
+CREATE DATABASE authservice;
+CREATE DATABASE userservice;
+CREATE DATABASE expenseservice;
+```
+
+### Step 3 — Configure application.properties
+In each Spring Boot service:
+```properties
+spring.datasource.username=YOUR_USERNAME
+spring.datasource.password=YOUR_PASSWORD
+```
+
+In `dsservice/.env`:
+OPENAI_API_KEY=your_mistral_api_key
+KAFKA_HOST=localhost
+KAFKA_PORT=9092
+
+### Step 4 — Start Services (in order)
+```bash
+# 1. AuthService (Port 9898)
+cd authservice && ./mvnw spring-boot:run
+
+# 2. UserService (Port 9810)
+cd userservice && ./mvnw spring-boot:run
+
+# 3. ExpenseService (Port 9820)
+cd expenseservice && ./mvnw spring-boot:run
+
+# 4. DataScience Service (Port 8000)
+cd dsservice
+python -m venv dsenv
+dsenv\Scripts\activate        # Windows
+pip install flask langchain langchain-mistralai kafka-python python-dotenv
+cd src && python -m app
+```
+
+### Step 5 — Run Frontend
+```bash
+cd expense-tracker-app
+npm install
+npx expo start
+```
+
+---
+
+## 📱 Frontend Repository
+[Expense Tracker App](https://github.com/KishanSingh29/expense-tracker-app)
+
+---
+
+## 👨‍💻 Author
+**Kishan Singh** — 3rd Year CS Student  
+[GitHub](https://github.com/KishanSingh29)
