@@ -1,7 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import * as Icon from "phosphor-react-native";
 import Header from "@/components/Header";
 import { PURPLE } from "@/constants/colors";
 import { getSummaryApi } from "@/services/api";
@@ -19,9 +18,17 @@ const EMPTY_SUMMARY: ExpenseSummary = {
   monthly_data: [],
 };
 
+const DATE_RANGES = [
+  { label: "7D", days: 7 },
+  { label: "30D", days: 30 },
+  { label: "3M", days: 90 },
+  { label: "6M", days: 180 },
+];
+
 export default function Statistics() {
   const [summary, setSummary] = useState<ExpenseSummary>(EMPTY_SUMMARY);
   const [loading, setLoading] = useState(true);
+  const [selectedDays, setSelectedDays] = useState(180);
 
   useFocusEffect(
     useCallback(() => {
@@ -29,7 +36,7 @@ export default function Statistics() {
       (async () => {
         try {
           setLoading(true);
-          const data = await getSummaryApi();
+          const data = await getSummaryApi(selectedDays);
           if (active) setSummary({ ...EMPTY_SUMMARY, ...data });
         } catch (error) {
           console.log("Failed to load summary:", error);
@@ -40,7 +47,7 @@ export default function Statistics() {
       return () => {
         active = false;
       };
-    }, [])
+    }, [selectedDays])
   );
 
   const totalIncome = Number(summary.total_income || 0);
@@ -50,14 +57,15 @@ export default function Statistics() {
   const categoryBreakdown = summary.category_breakdown || [];
   const recentTransactions = summary.recent_transactions || [];
 
-  const avgMonthlySpend = totalExpense / 6;
+  const selectedRangeLabel = DATE_RANGES.find((r) => r.days === selectedDays)?.label ?? "6M";
+  const avgMonthlySpend = totalExpense / Math.max(1, selectedDays / 30);
   const topCategory = categoryBreakdown[0];
   const topCategoryPercent =
     topCategory && totalExpense > 0 ? Math.round((Number(topCategory.total_amount) / totalExpense) * 100) : 0;
   const savingRate = totalIncome > 0 ? (savings / totalIncome) * 100 : 0;
 
   const STATS = [
-    { label: "Avg. monthly spend", value: formatCurrency(avgMonthlySpend), sub: "Last 6 months" },
+    { label: "Avg. monthly spend", value: formatCurrency(avgMonthlySpend), sub: `Last ${selectedRangeLabel}` },
     { label: "Top category", value: topCategory?.category ?? "—", sub: topCategory ? `${topCategoryPercent}% of spend` : "No data" },
     { label: "Saving rate", value: `${savingRate.toFixed(0)}%`, sub: "of income" },
     { label: "Transactions", value: `${recentTransactions.length}`, sub: "recent" },
@@ -91,10 +99,20 @@ export default function Statistics() {
             <Text style={styles.pageTitle}>Insights</Text>
             <Text style={styles.pageSubtitle}>Understand your spending patterns</Text>
           </View>
-          <TouchableOpacity style={styles.filterBtn}>
-            <Icon.CalendarBlank size={14} color={PURPLE.text} />
-            <Text style={styles.filterText}>Last 6 months</Text>
-          </TouchableOpacity>
+        </View>
+
+        <View style={styles.pillRow}>
+          {DATE_RANGES.map((range) => (
+            <TouchableOpacity
+              key={range.label}
+              style={[styles.pillBtn, selectedDays === range.days && styles.pillBtnActive]}
+              onPress={() => setSelectedDays(range.days)}
+            >
+              <Text style={[styles.pillText, selectedDays === range.days && styles.pillTextActive]}>
+                {range.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         {/* 4 STAT CARDS GRID */}
@@ -174,18 +192,26 @@ const styles = StyleSheet.create({
   },
   pageTitle: { color: PURPLE.text, fontSize: 24, fontWeight: "800" },
   pageSubtitle: { color: PURPLE.muted, fontSize: 12, marginTop: 4 },
-  filterBtn: {
+  pillRow: {
     flexDirection: "row",
+    gap: 8,
+    marginBottom: 20,
+  },
+  pillBtn: {
+    flex: 1,
     alignItems: "center",
-    gap: 6,
     backgroundColor: PURPLE.card,
     borderWidth: 1,
     borderColor: PURPLE.cardBorder,
     borderRadius: 12,
-    paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  filterText: { color: PURPLE.text, fontSize: 12, fontWeight: "600" },
+  pillBtnActive: {
+    backgroundColor: PURPLE.primary,
+    borderColor: PURPLE.primary,
+  },
+  pillText: { color: PURPLE.muted, fontSize: 13, fontWeight: "600" },
+  pillTextActive: { color: "#fff" },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",

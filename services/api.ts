@@ -148,10 +148,11 @@ export const addExpenseApi = async (data: {
 };
 
 // ========== SUMMARY API ==========
-export const getSummaryApi = async () => {
+export const getSummaryApi = async (days: number = 180) => {
   const userId = await AsyncStorage.getItem("userId");
   if (!userId) throw new Error("userId not found");
   const response = await expenseClient.get("/expense/v1/summary", {
+    params: { days },
     headers: { "X-User-Id": userId },
   });
   const raw = response.data;
