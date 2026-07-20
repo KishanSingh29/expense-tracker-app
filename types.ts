@@ -171,3 +171,53 @@ export type WalletType = {
   uid?: string;
   created?: Date;
 };
+
+// ========== EXPENSE SERVICE RESPONSE TYPES ==========
+// Backend DTOs use SnakeCaseStrategy for JSON, so keys are snake_case.
+export type CategoryBreakdown = {
+  category: string;
+  total_amount: number;
+};
+
+export type MonthlyDataPoint = {
+  month: string;
+  income: number;
+  expense: number;
+};
+
+export type RecentTransaction = {
+  amount: number;
+  merchant: string;
+  currency: string;
+  transaction_type: string;
+  created_at: string;
+};
+
+export type ExpenseSummary = {
+  total_income: number;
+  total_expense: number;
+  savings: number;
+  recent_transactions: RecentTransaction[];
+  category_breakdown: CategoryBreakdown[];
+  monthly_data: MonthlyDataPoint[];
+};
+
+export type SpendingLimitStatus = {
+  success?: boolean;
+  amount: number;
+  days: number;
+  start_date: string;
+  end_date: string;
+  total_spent: number;
+  remaining_limit: number;
+  days_left: number;
+};
+
+export type ProfileData = {
+  userId?: string;
+  firstName: string;
+  lastName: string;
+  phoneNumber?: number;
+  email: string;
+  profilePic?: string;
+};

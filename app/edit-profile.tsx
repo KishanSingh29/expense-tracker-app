@@ -1,62 +1,144 @@
-import { View, StyleSheet, Pressable, TextInput } from "react-native";
-import React, { useState } from "react";
+import {
+  View, StyleSheet, Pressable,
+  TextInput, Alert, ActivityIndicator, ScrollView
+} from "react-native";
+import React, { useEffect, useState } from "react";
 import Typo from "@/components/Typo";
 import * as Icon from "phosphor-react-native";
 import { useRouter } from "expo-router";
+import { getProfileApi, updateProfileApi } from "@/services/api";
 
 const EditProfile = () => {
   const router = useRouter();
-  const [name, setName] = useState("Kishan");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+
+  // ✅ Screen open hote hi current data load karo
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      setLoading(true);
+      const data = await getProfileApi();
+      setFirstName(data.firstName || "");
+      setLastName(data.lastName || "");
+      setPhoneNumber(data.phoneNumber?.toString() || "");
+    } catch (error) {
+      Alert.alert("Error", "Could not load profile data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdate = async () => {
+    if (!firstName.trim() || !lastName.trim()) {
+      Alert.alert("Validation", "First name and last name cannot be empty");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await updateProfileApi({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        phoneNumber: phoneNumber ? Number(phoneNumber) : undefined,
+      });
+      Alert.alert("Success", "Profile updated!", [
+        { text: "OK", onPress: () => router.back() },
+      ]);
+    } catch (error) {
+      Alert.alert("Error", "Could not update profile. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color="#84cc16" />
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      {/* 🔝 HEADER */}
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
+      {/* HEADER */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()}>
           <Icon.CaretLeft size={24} color="#fff" />
         </Pressable>
-
         <Typo size={18} fontWeight={"600"} color={"#fff"}>
           Update Profile
         </Typo>
-
         <View style={{ width: 24 }} />
       </View>
 
-      {/* 👤 PROFILE IMAGE */}
+      {/* AVATAR */}
       <View style={styles.avatarSection}>
         <View style={styles.avatar}>
           <Icon.User size={50} color="#ccc" />
         </View>
-
-        {/* edit icon */}
         <View style={styles.editIcon}>
           <Icon.Pencil size={16} color="#000" />
         </View>
       </View>
 
-      {/* 📝 INPUT */}
-      <View style={styles.inputContainer}>
-        <Typo size={14} color={"#aaa"}>
-          Name
-        </Typo>
+      {/* INPUTS */}
+      <View style={styles.inputGroup}>
+        <View style={styles.inputContainer}>
+          <Typo size={14} color={"#aaa"}>First Name</Typo>
+          <TextInput
+            value={firstName}
+            onChangeText={setFirstName}
+            placeholder="Enter first name"
+            placeholderTextColor="#666"
+            style={styles.input}
+          />
+        </View>
 
-        <TextInput
-          value={name}
-          onChangeText={setName}
-          placeholder="Enter name"
-          placeholderTextColor="#666"
-          style={styles.input}
-        />
+        <View style={styles.inputContainer}>
+          <Typo size={14} color={"#aaa"}>Last Name</Typo>
+          <TextInput
+            value={lastName}
+            onChangeText={setLastName}
+            placeholder="Enter last name"
+            placeholderTextColor="#666"
+            style={styles.input}
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Typo size={14} color={"#aaa"}>Phone Number</Typo>
+          <TextInput
+            value={phoneNumber}
+            onChangeText={setPhoneNumber}
+            placeholder="Enter phone number"
+            placeholderTextColor="#666"
+            keyboardType="phone-pad"
+            style={styles.input}
+          />
+        </View>
       </View>
 
-      {/* ✅ BUTTON */}
-      <Pressable style={styles.button}>
-        <Typo size={16} fontWeight={"600"} color={"#000"}>
-          Update
-        </Typo>
+      {/* UPDATE BUTTON */}
+      <Pressable
+        style={[styles.button, saving && { opacity: 0.6 }]}
+        onPress={handleUpdate}
+        disabled={saving}
+      >
+        {saving
+          ? <ActivityIndicator size="small" color="#000" />
+          : <Typo size={16} fontWeight={"600"} color={"#000"}>Update</Typo>
+        }
       </Pressable>
-    </View>
+    </ScrollView>
   );
 };
 
@@ -69,19 +151,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 50,
   },
-
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 30,
   },
-
   avatarSection: {
     alignItems: "center",
     marginBottom: 40,
   },
-
   avatar: {
     width: 110,
     height: 110,
@@ -90,7 +169,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
   editIcon: {
     position: "absolute",
     bottom: 5,
@@ -99,27 +177,26 @@ const styles = StyleSheet.create({
     padding: 6,
     borderRadius: 20,
   },
-
+  inputGroup: {
+    gap: 20,
+    marginBottom: 30,
+  },
   inputContainer: {
     gap: 8,
   },
-
   input: {
     borderWidth: 1,
     borderColor: "#444",
     borderRadius: 12,
     padding: 14,
     color: "#fff",
+    fontSize: 15,
   },
-
   button: {
-    position: "absolute",
-    bottom: 30,
-    left: 20,
-    right: 20,
-    backgroundColor: "#84cc16", // green
+    backgroundColor: "#84cc16",
     padding: 16,
     borderRadius: 14,
     alignItems: "center",
+    marginTop: 10,
   },
 });
