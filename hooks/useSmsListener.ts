@@ -1,8 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import { parseSmsApi } from "@/services/api";
 
 export const useSmsListener = () => {
+  const lastSmsRef = useRef<string>("");
+  const lastSmsTimeRef = useRef<number>(0);
+
   useEffect(() => {
     if (Platform.OS !== "android") return;
 
@@ -47,22 +50,73 @@ export const useSmsListener = () => {
             // ===============================
             // ✅ FIX 3: Clean SMS extraction
             // ===============================
+            // sms sometimes comes as a real array [sender, message], and
+            // sometimes as a stringified "[sender, message]" — handle both.
             let smsText = "";
 
             if (Array.isArray(sms)) {
-              smsText = sms[1] || "";
+              smsText = (sms[1] || "").toString().trim();
             } else if (typeof sms === "string") {
-              smsText = sms;
+              const trimmed = sms.trim();
+
+              if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+                const inner = trimmed.slice(1, -1);
+                const commaIndex = inner.indexOf(",");
+                smsText =
+                  commaIndex !== -1
+                    ? inner.slice(commaIndex + 1).trim()
+                    : inner.trim();
+              } else {
+                smsText = trimmed;
+              }
             }
 
             console.log("📩 CLEAN SMS:", smsText);
 
+            // ===============================
+            // ✅ FIX 4: Ignore truncated multi-part SMS
+            // ===============================
+            // Long SMS arrives across multiple parts on Android; the
+            // trailing/leading fragments are too short to be a real
+            // bank SMS, so skip them instead of sending to the API.
+            const MIN_SMS_LENGTH = 20;
+
+            if (smsText.length < MIN_SMS_LENGTH) {
+              console.log(
+                "⏭️ Skipping short/truncated SMS part:",
+                smsText
+              );
+              return;
+            }
+
+            // ===============================
+            // ✅ FIX 5: Duplicate SMS dedup
+            // ===============================
+            // The native listener sometimes fires the same SMS multiple
+            // times in quick succession — skip repeats within 5 seconds.
+            const now = Date.now();
+            if (
+              smsText === lastSmsRef.current &&
+              now - lastSmsTimeRef.current < 5000
+            ) {
+              console.log("⏭️ Duplicate SMS skipped");
+              return;
+            }
+            lastSmsRef.current = smsText;
+            lastSmsTimeRef.current = now;
+
             if (smsText && smsText.length > 0) {
               parseSmsApi(smsText)
-                .then((result) => {
-                  console.log("✅ Expense parsed:", result);
+                .then((response) => {
+                  if (response?.error) {
+                    if (response.error === "not a bank SMS") return;
+                    console.log("❌ Parse error:", response.error);
+                    return;
+                  }
+                  console.log("SMS processed:", response);
                 })
                 .catch((err) => {
+                  if (err?.response?.data?.error === "not a bank SMS") return;
                   console.log(
                     "❌ Parse error:",
                     err?.message || err,
