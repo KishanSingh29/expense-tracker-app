@@ -56,16 +56,18 @@ npx expo start --dev-client
 
 ## Backend Connection
 
-This app talks to the [backend microservices](https://github.com/KishanSingh29/Expence) over REST. Before running the app, point it at your backend host:
+This app talks to the [backend microservices](https://github.com/KishanSingh29/Expence) over REST, deployed on a GCP VM behind an Nginx reverse proxy that does path-based routing to each service.
 
 1. Open [`services/api.ts`](services/api.ts)
-2. Update the base IP used by `AUTH_BASE_URL`, `USER_BASE_URL`, `EXPENSE_BASE_URL`, and `DS_BASE_URL` to your machine's local network IP (where the backend's `docker-compose up -d` is running)
+2. Update `BASE_URL` to point at your Nginx host. Each service is reached via its path prefix:
 
 ```ts
-const AUTH_BASE_URL = "http://<your-ip>:9898";
-const USER_BASE_URL = "http://<your-ip>:9810";
-const EXPENSE_BASE_URL = "http://<your-ip>:9820";
-const DS_BASE_URL = "http://<your-ip>:8000";
+const BASE_URL = "http://<your-nginx-host>";
+
+const AUTH_BASE_URL = `${BASE_URL}/auth`;
+const USER_BASE_URL = `${BASE_URL}/user`;
+const EXPENSE_BASE_URL = `${BASE_URL}/expense`;
+const DS_BASE_URL = `${BASE_URL}/ds`;
 ```
 
 Backend repo: [Expense Tracker — Backend Microservices](https://github.com/KishanSingh29/Expence)
