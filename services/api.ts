@@ -1,12 +1,12 @@
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const BASE_URL = "http://35.184.198.108"; // sirf yahan change karo
+const BASE_IP = "192.168.4.157"; // sirf yahan change karo
 
-const AUTH_BASE_URL = `${BASE_URL}/auth`;
-const USER_BASE_URL = `${BASE_URL}/user`;
-const EXPENSE_BASE_URL = `${BASE_URL}/expense`;
-const DS_BASE_URL = `${BASE_URL}/ds`;
+const AUTH_BASE_URL = `http://${BASE_IP}:9898`;
+const USER_BASE_URL = `http://${BASE_IP}:9810`;
+const EXPENSE_BASE_URL = `http://${BASE_IP}:9820`;
+const DS_BASE_URL = `http://${BASE_IP}:8000`;
 
 export const authClient = axios.create({
   baseURL: AUTH_BASE_URL,
