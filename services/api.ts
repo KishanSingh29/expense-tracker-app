@@ -1,7 +1,7 @@
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const BASE_IP = "192.168.4.157"; // sirf yahan change karo
+const BASE_IP = "192.168.4.162"; // sirf yahan change karo
 
 const AUTH_BASE_URL = `http://${BASE_IP}:9898`;
 const USER_BASE_URL = `http://${BASE_IP}:9810`;
